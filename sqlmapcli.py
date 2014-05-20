@@ -123,10 +123,9 @@ class SqlmapClient(object):
         else:
             raise OperationFailed("Admin flush tasks Failed, Response<%s>" % resp.status_code)
 
-
     def start_scan(self, taskid):
         uri = "".join(["/scan/", taskid, "/start"])
-        headers = {"content-type":"application/json"}
+        headers = {"content-type": "application/json"}
 
         try:
             resp = requests.post(urljoin(self.addr, uri),
@@ -177,7 +176,6 @@ class SqlmapClient(object):
         else:
             raise OperationFailed("Failed to kill task<%s>,Response<%s>" % (taskid, resp.status_code))
 
-
     def get_scan_status(self, taskid):
         uri = "".join(["/scan/", taskid, "/status"])
         try:
@@ -196,7 +194,7 @@ class SqlmapClient(object):
             raise OperationFailed("Failed to get task<%s> status,Response<%s>" % (taskid, resp.status_code))
 
     def get_scan_report(self, taskid):
-        uri = "".join(["/scan/", taskid, "/status"])
+        uri = "".join(["/scan/", taskid, "/data"])
         try:
             resp = requests.get(urljoin(self.addr, uri))
         except requests.RequestException, e:
@@ -236,24 +234,23 @@ class SqlmapClient(object):
         if timeout:
             timer = Timer(timeout, self.ontimeout, (taskid,))
             timer.start()
+
+        result = []
         try:
             self.start_scan(taskid)
             retcode = self.get_scan_status(taskid)
             while retcode is None:
                 time.sleep(5)
                 retcode = self.get_scan_status(taskid)
-
             if retcode == 0:
-                data = self.get_scan_report(taskid)
-            else:
-                data = None
+                result, _ = self.get_scan_report(taskid)
             if timeout:
                 timer.cancel()
         except OperationFailed, e:
             if timeout:
                 timer.cancel()
             raise e
-        return Report(data)
+        return Report(url, result)
 
     def ontimeout(self, taskid):
         if self.get_scan_status(taskid) is None:
@@ -262,19 +259,19 @@ class SqlmapClient(object):
 #######################################################################
 if __name__ == '__main__':
 
-    filepath = "result_test.txt"
+    filepath = "/home/jetz/Desktop/test.txt"
     f = open(filepath, "r")
 
     client = SqlmapClient()
     try:
         taskid = client.create_task()
     except Exception, e:
-        logger.error("Failed to create task: %s",e)
+        logger.error("Failed to create task: %s", e)
         sys.exit(1)
     client.set_option("dbms", "mysql")  # .set_option("bulkFile", filepath)
     for url in f.readlines():
         try:
-            res = client.run(taskid, url, 20)
+            res = client.run(taskid, url)
         except Exception, e:
             logger.error(e)
             continue
