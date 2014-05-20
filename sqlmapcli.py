@@ -270,7 +270,7 @@ class SqlmapClient(object):
 #######################################################################
 if __name__ == '__main__':
 
-    filepath = "/home/jetz/Desktop/test.txt"
+    filepath = "test.txt"
     f = open(filepath, "r")
 
     client = SqlmapClient()
@@ -282,7 +282,10 @@ if __name__ == '__main__':
     client.set_option("dbms", "mysql")  # .set_option("bulkFile", filepath)
     for url in f.readlines():
         try:
-            res = client.run(taskid, url)
+            report = client.run(taskid, url.strip())
+            logger.info(report.url)
+            for d in report.contents[0].values[0].data:
+                logger.info("id: %s, title: %s", d.id, d.title)
         except Exception, e:
             logger.error(e)
             continue

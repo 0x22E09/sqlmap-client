@@ -51,11 +51,11 @@ class ReportItem(object):
 
 class Report(object):
     def __init__(self, url, data):
-        self.count = 0
         self.url = url
-        self.reports = []
+        self.count = 0
+        self.contents = []
         for d in data:
-            self.reports.append(ReportItem(d))
+            self.contents.append(ReportItem(d))
             self.count += 1
 
     def __str__(self):
