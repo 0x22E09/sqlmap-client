@@ -24,14 +24,16 @@
 #   @get("/download/<taskid>/<target>/<filename:path>")
 # ---------------------------------------------------------------
 
+import os
 import sys
 import time
 import json
+import shutil
 import logging
 import requests
 from report import Report
 from threading import Timer
-from urlparse import urljoin
+from urlparse import urljoin, urlparse
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler(sys.stdout))
@@ -228,7 +230,8 @@ class SqlmapClient(object):
 
     def run(self, taskid, url=None, timeout=None):
 
-        if url is not None:
+        if url:
+            self.scan_url = url
             self.set_option("url", url)
 
         if timeout:
@@ -256,6 +259,14 @@ class SqlmapClient(object):
         if self.get_scan_status(taskid) is None:
             self.kill_scan(taskid)
 
+    def clear_output(self, path=None):
+        if path is None:
+            path = os.path.join(os.getenv("HOME"), ".sqlmap/output")
+        taskdir = os.path.join(path, urlparse(self.scan_url).hostname)
+        if os.path.exists(taskdir):
+            shutil.rmtree(taskdir)
+
+
 #######################################################################
 if __name__ == '__main__':
 
@@ -277,5 +288,6 @@ if __name__ == '__main__':
             continue
 
     client.delete_task(taskid)
+    client.clear_output()
 
     f.close()
