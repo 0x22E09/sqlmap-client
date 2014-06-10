@@ -1,27 +1,15 @@
 #!/usr/bin/env python
 
-# RESTful API for sqlmap server
+# RESTful API(Part) for sqlmap server
 # ---------------------------------------------------------------
 #   @get("/task/new")
 #   @get("/task/<taskid>/delete")
-
-#   @get("/admin/<taskid>/list")
-#   @get("/admin/<taskid>/flush")
 
 #   @post("/scan/<taskid>/start")
 #   @get("/scan/<taskid>/stop")
 #   @get("/scan/<taskid>/kill")
 #   @get("/scan/<taskid>/status")
 #   @get("/scan/<taskid>/data")
-
-#   @get("/scan/<taskid>/log/<start>/<end>")
-#   @get("/scan/<taskid>/log")
-
-#   @get("/option/<taskid>/list")
-#   @post("/option/<taskid>/get")
-#   @post("/option/<taskid>/set")
-
-#   @get("/download/<taskid>/<target>/<filename:path>")
 # ---------------------------------------------------------------
 
 import os
@@ -44,6 +32,7 @@ RESTAPI_SERVER_PORT = 8775
 
 
 class OperationFailed(Exception):
+
     def __init__(self, msg="???"):
         self.msg = msg
 
@@ -52,9 +41,11 @@ class OperationFailed(Exception):
 
 
 class SqlmapClient(object):
+
     """
     Sqlmap REST-JSON API client
     """
+
     def __init__(self, host=RESTAPI_SERVER_HOST, port=RESTAPI_SERVER_PORT):
         self.addr = "http://%s:%d" % (host, port)
         self.options = dict()
@@ -63,201 +54,173 @@ class SqlmapClient(object):
     def create_task(self):
         try:
             resp = requests.get(urljoin(self.addr, "/task/new"))
-        except requests.RequestException, e:
+        except requests.RequestException as e:
             raise e
         if resp.status_code == 200:
             r = resp.json()
             if r.get("success", False):
-                taskid = r.get("taskid", None)
-                logger.info(">>> Create task<%s>", taskid)
-                return taskid
+                self.taskid = r.get("taskid", None)
+                logger.info(">>> Create task<%s>", self.taskid)
+                return self.taskid
             else:
                 raise OperationFailed("Failed to create task")
         else:
-            raise OperationFailed("Failed to create task, Response<%d>" % resp.status_code)
+            raise OperationFailed("Failed to create task, Response<%d>" %
+                                  resp.status_code)
 
-    def delete_task(self, taskid):
+    def delete_task(self, taskid=None):
+        if taskid is None:
+            taskid = self.taskid
         uri = "".join(["/task/", taskid, "/delete"])
         try:
             resp = requests.get(urljoin(self.addr, uri))
-        except requests.RequestException, e:
+        except requests.RequestException as e:
             raise e
         if resp.status_code == 200:
             r = resp.json()
             if r.get("success", False):
-                logger.info(">>> Delete task<%s>", taskid)
+                logger.info("<<< Delete task<%s>", taskid)
                 return True
             else:
-                raise OperationFailed("Failed to delete task<%s>:%s" % (taskid, r.get("message")))
+                raise OperationFailed("Failed to delete task<%s>:%s" %
+                                      (taskid, r.get("message")))
         else:
-            raise OperationFailed("Failed to delete task<%s>, Response<%s>" % (taskid, resp.status_code))
+            raise OperationFailed("Failed to delete task<%s>, Response<%s>" %
+                                  (taskid, resp.status_code))
 
-    def admin_list(self, taskid, action):
-        uri = "".join(["/admin/", taskid, "/list"])
-        try:
-            resp = requests.get(urljoin(self.addr, uri))
-        except requests.RequestException, e:
-            raise e
-        if resp.status_code == 200:
-            r = resp.json()
-            if r.get("success", False):
-                ntask, tasks = r.get("tasks_num"), r.get("tasks")
-                logger.info("Admin list %d tasks:%s", ntask, tasks)
-                return ntask, tasks
-            else:
-                raise OperationFailed("Failed to list tasks:%s" % r.get("message"))
-        else:
-            raise OperationFailed("Failed to list tasks, Response<%s>" % resp.status_code)
-
-    def admin_flush(self, taskid):
-        uri = "".join(["/admin/", taskid, "/flush"])
-        try:
-            resp = requests.get(urljoin(self.addr, uri))
-        except requests.RequestException, e:
-            raise e
-        if resp.status_code == 200:
-            r = resp.json()
-            if r.get("success", False):
-                logger.info("Admin flush tasks Success")
-                return True
-            else:
-                raise OperationFailed("Admin flush tasks Failed: %s" % r.get("message"))
-        else:
-            raise OperationFailed("Admin flush tasks Failed, Response<%s>" % resp.status_code)
-
-    def start_scan(self, taskid):
-        uri = "".join(["/scan/", taskid, "/start"])
+    def start_scan(self):
+        uri = "".join(["/scan/", self.taskid, "/start"])
         headers = {"content-type": "application/json"}
 
         try:
             resp = requests.post(urljoin(self.addr, uri),
                                  data=json.dumps(self.options),
                                  headers=headers)
-        except requests.RequestException, e:
+        except requests.RequestException as e:
             raise e
         if resp.status_code == 200:
             r = resp.json()
             if r.get("success", False):
-                engineid = r.get("engineid")
-                logger.info("Start task<%s>, EngineID:%s", taskid, engineid)
-                return engineid
+                self.engineid = r.get("engineid")
+                logger.info("Task<%s> start scanning engine<%s>",
+                            self.taskid, self.engineid)
             else:
-                raise OperationFailed("Failed to start task<%s>:%s" % (taskid, r.get("message")))
+                raise OperationFailed("Task<%s> failed to start engine<%s>:%s" %
+                                      (self.taskid, self.engineid, r.get("message")))
         else:
-            raise OperationFailed("Failed to start task<%s>,Response<%s>" % (taskid, resp.status_code))
+            raise OperationFailed("Task<%s> failed to start engine<%s>, Response<%s>" %
+                                  (self.taskid, self.engineid, resp.status_code))
 
-    def stop_scan(self, taskid):
-        uri = "".join(["/scan/", taskid, "/stop"])
+    def stop_scan(self):
+        uri = "".join(["/scan/", self.taskid, "/stop"])
         try:
             resp = requests.get(urljoin(self.addr, uri))
-        except requests.RequestException, e:
+        except requests.RequestException as e:
             raise e
         if resp.status_code == 200:
             r = resp.json()
             if r.get("success", False):
-                logger.info("Stop task<%s>", taskid)
+                logger.info("Task<%s> stop engine<%s>",
+                            self.taskid, self.engineid)
                 return True
             else:
-                raise OperationFailed("Failed to stop task<%s>:%s" % (taskid, r.get("message")))
+                raise OperationFailed("Task<%s> failed to stop engine<%s>:%s" %
+                                      (self.taskid, self.engineid, r.get("message")))
         else:
-            raise OperationFailed("Failed to stop task<%s>,Response<%s>" % (taskid, resp.status_code))
+            raise OperationFailed("Task<%s> failed to stop engine<%s>, Response<%s>" %
+                                  (self.taskid, self.engineid, resp.status_code))
 
-    def kill_scan(self, taskid):
-        uri = "".join(["/scan/", taskid, "/kill"])
+    def kill_scan(self):
+        uri = "".join(["/scan/", self.taskid, "/kill"])
         try:
             resp = requests.get(urljoin(self.addr, uri))
-        except requests.RequestException, e:
+        except requests.RequestException as e:
             raise e
         if resp.status_code == 200:
             r = resp.json()
             if r.get("success", False):
-                logger.info("Kill task<%s>", taskid)
+                logger.info("Task<%s> kill engine<%s>", self.taskid, self.engineid)
                 return True
             else:
-                raise OperationFailed("Failed to kill task<%s>:%s" % (taskid, r.get("message")))
+                raise OperationFailed("Task<%s> failed to kill engine<%s>:%s" %
+                                      (self.taskid, self.engineid, r.get("message")))
         else:
-            raise OperationFailed("Failed to kill task<%s>,Response<%s>" % (taskid, resp.status_code))
+            raise OperationFailed("Task<%s> failed to kill engineid<%s>,Response<%s>" %
+                                  (self.taskid, self.engineid, resp.status_code))
 
-    def get_scan_status(self, taskid):
-        uri = "".join(["/scan/", taskid, "/status"])
+    def get_scan_status(self):
+        uri = "".join(["/scan/", self.taskid, "/status"])
         try:
             resp = requests.get(urljoin(self.addr, uri))
-        except requests.RequestException, e:
+        except requests.RequestException as e:
             raise e
         if resp.status_code == 200:
             r = resp.json()
             if r.get("success", False):
                 status, retcode = r.get("status"), r.get("returncode")
-                logger.info("Task<%s> status: %s", taskid, status)
+                logger.info("Engine<%s>(Task<%s>) status: %s", self.engineid, self.taskid, status)
                 return retcode
             else:
-                raise OperationFailed("Failed to get task<%s> status:%s" % (taskid, r.get("message")))
+                raise OperationFailed("Failed to get engine<%s>(Task<%s>) status:%s" %
+                                      (self.engineid, self.taskid, r.get("message")))
         else:
-            raise OperationFailed("Failed to get task<%s> status,Response<%s>" % (taskid, resp.status_code))
+            raise OperationFailed("Failed to get engine<%s>(Task<%s>) status,Response<%s>" %
+                                  (self.engineid, self.taskid, resp.status_code))
 
-    def get_scan_report(self, taskid):
-        uri = "".join(["/scan/", taskid, "/data"])
+    def get_scan_report(self):
+        uri = "".join(["/scan/", self.taskid, "/data"])
         try:
             resp = requests.get(urljoin(self.addr, uri))
-        except requests.RequestException, e:
+        except requests.RequestException as e:
             raise e
         if resp.status_code == 200:
             r = resp.json()
             if r.get("success", False):
                 data, error = r.get("data"), r.get("error")
-                logger.info("Get task<%s> report, error: %s", taskid, error)
+                logger.info("Get engine<%s>(Task<%s>) report, error: %s",
+                            self.engineid, self.taskid, error)
                 return data, error
             else:
-                raise OperationFailed("Failed to get task<%s> report:%s" % (taskid, r.get("message")))
+                raise OperationFailed("Failed to get engine<%s>(Task<%s>) report:%s" %
+                                      (self.engineid, self.taskid, r.get("message")))
         else:
-            raise OperationFailed("Failed to get task<%s> report,Response<%s>" % (taskid, resp.status_code))
-
-    def get_scan_log(self, taskid, start=None, end=None):
-        raise NotImplementedError()
+            raise OperationFailed("Failed to get engine<%s>(Task<%s>) report,Response<%s>" %
+                                  (self.engineid, self.taskid, resp.status_code))
 
     def set_option(self, key, value):
         self.options[key] = value
         return self
 
-    def get_option(self, key):
-        raise NotImplementedError()
-
-    def list_option(self):
-        raise NotImplementedError()
-
-    def download(self):
-        raise NotImplementedError()
-
-    def run(self, taskid, url=None, timeout=None):
+    def run(self, url=None, timeout=None):
 
         if url:
             self.scan_url = url
             self.set_option("url", url)
 
         if timeout:
-            timer = Timer(timeout, self.ontimeout, (taskid,))
+            timer = Timer(timeout, self.ontimeout)
             timer.start()
 
         result = []
         try:
-            self.start_scan(taskid)
-            retcode = self.get_scan_status(taskid)
+            self.start_scan()
+            retcode = self.get_scan_status()
             while retcode is None:
                 time.sleep(5)
-                retcode = self.get_scan_status(taskid)
+                retcode = self.get_scan_status()
             if retcode == 0:
-                result, _ = self.get_scan_report(taskid)
+                result, _ = self.get_scan_report()
             if timeout:
                 timer.cancel()
-        except OperationFailed, e:
+        except OperationFailed as e:
             if timeout:
                 timer.cancel()
             raise e
         return Report(url, result)
 
-    def ontimeout(self, taskid):
-        if self.get_scan_status(taskid) is None:
-            self.kill_scan(taskid)
+    def ontimeout(self):
+        if self.get_scan_status() is None:
+            self.kill_scan()
 
     def clear_output(self, path=None):
         if path is None:
@@ -276,21 +239,20 @@ if __name__ == '__main__':
     client = SqlmapClient()
     try:
         taskid = client.create_task()
-    except Exception, e:
+    except Exception as e:
         logger.error("Failed to create task: %s", e)
         sys.exit(1)
     client.set_option("dbms", "mysql")  # .set_option("bulkFile", filepath)
     for url in f.readlines():
         try:
-            report = client.run(taskid, url.strip())
-            logger.info(report.url)
+            report = client.run(url.strip())
+            client.clear_output()
             for d in report.contents[0].values[0].data:
                 logger.info("id: %s, title: %s", d.id, d.title)
-        except Exception, e:
+        except Exception as e:
             logger.error(e)
             continue
 
     client.delete_task(taskid)
-    client.clear_output()
 
     f.close()
